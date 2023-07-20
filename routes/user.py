@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,Request
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from models.user import User, Base
+from models.user import User, Base,CreateUser
 from database import get_db, engine
 
 Base.metadata.create_all(bind=engine)
+templates = Jinja2Templates(directory="templates")
 
 router = APIRouter()
 
@@ -23,12 +26,17 @@ def get_users(db: Session = Depends(get_db)):
 
 
 @router.post("/users")
-def create_user(username: str, email: str, db: Session = Depends(get_db)):
-    user = User(username=username, email=email)
+def create_user(user_data: CreateUser, db: Session = Depends(get_db)):
+    user = User(username=user_data.username, email=user_data.email)
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
+
+@router.get("/users/render", response_class=HTMLResponse)
+async def render_users(request: Request, db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return templates.TemplateResponse("index.html", {"request": request, "users": users})
 
 
 @router.put("/users/{user_id}")
@@ -51,3 +59,5 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully"}
+
+
